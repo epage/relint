@@ -1,66 +1,71 @@
+#[macro_use]
 extern crate clap;
 
-#[derive(Debug)]
-enum ArgumentError {
-    Clap(clap::Error),
-}
+#[macro_use]
+mod macros;
+mod errors;
 
-impl std::fmt::Display for ArgumentError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ArgumentError::Clap(ref err) => err.fmt(f),
-        }
+use std::io;
+use std::io::Write;
+use std::error::Error as StdError;
+use errors::{Error, ConfigError};
+
+arg_enum! {
+    #[derive(Debug)]
+    enum StdIn {
+        Content,
+        Paths
     }
 }
 
-impl std::error::Error for ArgumentError {
-    fn description(&self) -> &str {
-        match *self {
-            ArgumentError::Clap(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            ArgumentError::Clap(ref err) => Some(err),
-        }
-    }
-}
-
-impl From<clap::Error> for ArgumentError {
-    fn from(err: clap::Error) -> ArgumentError {
-        ArgumentError::Clap(err)
-    }
-}
-
-fn parse_args() -> Result<(), ArgumentError> {
+fn parse_args() -> Result<(), clap::Error> {
     let arg = |name| {
        clap::Arg::with_name(name)
     };
     let flag = |name| arg(name).long(name);
     let option = |name, value| arg(name).long(name).value_name(value);
 
-    clap::App::new("ReLint")
+    let matches = try!(clap::App::new("ReLint")
         .version("0.1")
         .author("Ed Page")
         .about("Custom linting through regular expressions")
         .arg(arg("path").multiple(true))
+        .arg(option("stdin", "FORMAT")
+            .possible_values(&StdIn::variants())
+            .conflicts_with_all(&["path"])
+            .help("Expected format when reading from stdin"))
         .arg(option("config", "FILE")
             .short("c")
             .help("Lints (searches up path if not specified)"))
         .arg(flag("quiet").short("q")
             .help("Do not print any result"))
-        .get_matches();
+        .get_matches_safe());
     Ok(())
 }
 
-fn run() -> Result<(), ArgumentError> {
-    parse_args()
+fn run() -> Result<(), Error> {
+    let matches = parse_args();
+    if let Err(e) = matches {
+        if ! e.use_stderr() {
+            let out = io::stdout();
+            writeln!(&mut out.lock(), "{}", e.description());
+            return Ok(())
+        }
+        return Err(From::from(e));
+    }
+    Ok(())
+}
+
+fn failed(e: Error, code: i32) -> ! {
+    wlnerr!("{}", e.description());
+    std::process::exit(code)
 }
 
 fn main() {
-    match run() {
-        Ok(()) => std::process::exit(0),
-        Err(_) => std::process::exit(1),
+    if let Err(e) = run() {
+        match e {
+            Error::Argument { .. } => failed(e, 1),
+            Error::Config { .. } => failed(e, 2),
+        }
     }
 }
