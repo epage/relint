@@ -7,10 +7,7 @@ use std::io;
 
 #[derive(Debug)]
 pub enum ConfigError {
-    Io {
-        err: io::Error,
-        path: path::PathBuf,
-    }
+    Io { err: io::Error, path: path::PathBuf },
 }
 
 impl error::Error for ConfigError {
@@ -22,7 +19,7 @@ impl error::Error for ConfigError {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            ConfigError::Io { ref err , .. } => Some(err),
+            ConfigError::Io { ref err, .. } => Some(err),
         }
     }
 }
@@ -30,7 +27,7 @@ impl error::Error for ConfigError {
 impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ConfigError::Io { ref err , .. } => err.fmt(f),
+            ConfigError::Io { ref err, .. } => err.fmt(f),
         }
     }
 }
