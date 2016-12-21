@@ -1,0 +1,19 @@
+[package]
+name = "relint"
+version = "0.0.1"
+authors = [ "Ed Page <eopage@byu.net>" ]
+description = """
+Regular expression based code linting
+"""
+documentation = "https:github.com/epage/relint"
+homepage = "https:github.com/epage/relint"
+readme = "README.md"
+keywords = ["regex", "lint"]
+license = "Unlicense/MIT"
+
+[[bin]]
+name = "relint"
+
+[dependencies]
+clap = "2.19"
+
