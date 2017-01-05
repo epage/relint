@@ -6,6 +6,39 @@ use std::path;
 use std::io;
 
 #[derive(Debug)]
+pub enum ArgumentError {
+    Clap(clap::Error),
+}
+
+impl error::Error for ArgumentError {
+    fn description(&self) -> &str {
+        match *self {
+            ArgumentError::Clap(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            ArgumentError::Clap(ref err) => Some(err),
+        }
+    }
+}
+
+impl fmt::Display for ArgumentError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ArgumentError::Clap(ref err) => err.fmt(f),
+        }
+    }
+}
+
+impl From<clap::Error> for ArgumentError {
+    fn from(err: clap::Error) -> ArgumentError {
+        ArgumentError::Clap(err)
+    }
+}
+
+#[derive(Debug)]
 pub enum ConfigError {
     Io { err: io::Error, path: path::PathBuf },
 }
@@ -34,7 +67,7 @@ impl fmt::Display for ConfigError {
 
 #[derive(Debug)]
 pub enum Error {
-    Argument(clap::Error),
+    Argument(ArgumentError),
     Config(ConfigError),
 }
 
@@ -63,8 +96,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl From<clap::Error> for Error {
-    fn from(err: clap::Error) -> Error {
+impl From<ArgumentError> for Error {
+    fn from(err: ArgumentError) -> Error {
         Error::Argument(err)
     }
 }

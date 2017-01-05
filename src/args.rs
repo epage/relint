@@ -9,7 +9,7 @@ use std::env;
 use std::error::Error as StdError;
 
 use atty;
-use errors::Error;
+use errors;
 
 static CWD: &'static str = "./";
 static STDIN: &'static str = "-";
@@ -50,7 +50,7 @@ pub struct App {
 impl PathWalkSource {
     fn from_args(paths: Vec<path::PathBuf>,
                  matches: &clap::ArgMatches)
-                 -> Result<PathWalkSource, Error> {
+                 -> Result<PathWalkSource, errors::ArgumentError> {
         let source = PathWalkSource {
             paths: paths,
             follow: matches.is_present("follow"),
@@ -65,14 +65,14 @@ impl PathWalkSource {
 }
 
 impl StdInSource {
-    fn from_args(matches: &clap::ArgMatches) -> Result<StdInSource, Error> {
+    fn from_args(matches: &clap::ArgMatches) -> Result<StdInSource, errors::ArgumentError> {
         let source = StdInSource {};
         Ok(source)
     }
 }
 
 impl InputSource {
-    fn from_args(matches: &clap::ArgMatches) -> Result<InputSource, Error> {
+    fn from_args(matches: &clap::ArgMatches) -> Result<InputSource, errors::ArgumentError> {
         let paths: Vec<path::PathBuf> = match matches.values_of("path") {
             None => vec![default_path()],
             Some(vals) => vals.map(|p| path::Path::new(p).to_path_buf()).collect(),
@@ -86,7 +86,7 @@ impl InputSource {
 }
 
 impl App {
-    pub fn from_args(matches: &clap::ArgMatches) -> Result<App, Error> {
+    pub fn from_args(matches: &clap::ArgMatches) -> Result<App, errors::ArgumentError> {
         let lint_path = get_project_file(&matches, "lints", DEFAULT_CONFIG_FILE)?;
 
         let input_source = InputSource::from_args(&matches)?;
@@ -118,7 +118,7 @@ fn validate_number(s: String) -> Result<(), String> {
 
 fn parsed_value_of<F: str::FromStr>(matches: &clap::ArgMatches,
                                     name: &str)
-                                    -> Result<Option<F>, Error>
+                                    -> Result<Option<F>, errors::ArgumentError>
     where <F as str::FromStr>::Err: fmt::Debug
 {
     match matches.value_of(name) {
@@ -179,7 +179,7 @@ fn build_app<'a>() -> clap::App<'a, 'a> {
             .validator(validate_number))
 }
 
-pub fn parse_args<'a>() -> Result<Option<clap::ArgMatches<'a>>, Error> {
+pub fn parse_args<'a>() -> Result<Option<clap::ArgMatches<'a>>, errors::ArgumentError> {
     match build_app().get_matches_safe() {
         Ok(m) => Ok(Some(m)),
         Err(e) => {
@@ -208,7 +208,7 @@ fn find_project_file(dir: &path::Path, name: &str) -> Option<path::PathBuf> {
 fn get_project_file(matches: &clap::ArgMatches,
                     name: &str,
                     default: &str)
-                    -> Result<path::PathBuf, Error> {
+                    -> Result<path::PathBuf, errors::ArgumentError> {
     let cwd = env::current_dir().expect("How does this fail?");
     let path = matches.value_of(name)
         .map(|p| Some(path::Path::new(p).to_path_buf()))
@@ -229,7 +229,7 @@ fn default_path() -> path::PathBuf {
     path::Path::new(default_path).to_path_buf()
 }
 
-fn is_stdin_requested(paths: &[path::PathBuf]) -> Result<bool, Error> {
+fn is_stdin_requested(paths: &[path::PathBuf]) -> Result<bool, errors::ArgumentError> {
     if paths.len() == 1 {
         return Ok(paths[0] == path::Path::new(STDIN));
     } else {
