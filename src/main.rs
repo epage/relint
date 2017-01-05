@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate clap;
+#[cfg(windows)]
+extern crate kernel32;
+#[cfg(windows)]
+extern crate winapi;
 
 #[macro_use]
 mod macros;
 mod errors;
 mod args;
 mod atty;
-#[cfg(windows)]
-extern crate kernel32;
-#[cfg(windows)]
-extern crate winapi;
 
 use std::error::Error as StdError;
 
