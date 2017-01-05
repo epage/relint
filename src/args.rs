@@ -213,10 +213,12 @@ fn get_project_file(matches: &clap::ArgMatches,
     let path = matches.value_of(name)
         .map(|p| Some(path::Path::new(p).to_path_buf()))
         .unwrap_or_else(|| find_project_file(cwd.as_path(), DEFAULT_CONFIG_FILE))
-        .ok_or(clap::Error::with_description(&format!("The following required argument was not \
-                                                      provided: --{}",
-                                                      name),
-                                             clap::ErrorKind::MissingRequiredArgument))?;
+        .ok_or_else(|| {
+            clap::Error::with_description(&format!("The following required argument was not \
+                                                    provided: --{}",
+                                                   name),
+                                          clap::ErrorKind::MissingRequiredArgument)
+        })?;
     Ok(path)
 }
 
