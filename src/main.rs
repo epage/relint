@@ -25,7 +25,8 @@ fn run() -> Result<(), Error> {
         None => return Ok(()),
     };
     let app = args::App::from_args(&matches)?;
-    let lints = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
+    let factory = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
+    let lints = factory.build_lints()?;
     Ok(())
 }
 
