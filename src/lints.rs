@@ -163,6 +163,7 @@ pub struct TomlLintFactory {
 }
 
 impl TomlLintFactory {
+    // TODO: compose errors to add context as the stack unwinds
     pub fn new(content: &str) -> Result<TomlLintFactory, errors::ConfigError> {
         let mut parser = toml::Parser::new(content);
         let root = parser.parse()
@@ -181,28 +182,31 @@ impl TomlLintFactory {
     pub fn build_types(&self) -> Result<ignore::types::TypesBuilder, errors::ConfigError> {
         let mut btypes = ignore::types::TypesBuilder::new();
         btypes.add_defaults();
-        if let Some(adds) = self.root.lookup("relint.types.add") {
-            for def in adds.as_slice()
-                .ok_or_else(|| {
-                    errors::ConfigError::Processing { desc: "Invalid field \"add\"".to_string() }
-                })?
-                .iter()
-                .map(FileTypeDef::new_from_value) {
-                let def = def?;
-                let name = def.name;
-                let glob = def.glob;
-                btypes.add(name, glob)?;
-            }
+        let nullArray = toml::Value::Array(Vec::new());
+        for def in self.root
+            .lookup("relint.types.add")
+            .unwrap_or(&nullArray)
+            .as_slice()
+            .ok_or_else(|| {
+                errors::ConfigError::Processing { desc: "Invalid field \"add\"".to_string() }
+            })?
+            .iter()
+            .map(FileTypeDef::new_from_value) {
+            let def = def?;
+            let name = def.name;
+            let glob = def.glob;
+            btypes.add(name, glob)?;
         }
-        if let Some(ref clears) = self.root.lookup("relint.types.clear") {
-            for type_clear in clears.as_slice()
-                .ok_or_else(|| {
-                    errors::ConfigError::Processing { desc: "Invalid field \"clear\"".to_string() }
-                })?
-                .iter()
-                .map(|s| force_as_str(s, "Type-to-clear")) {
-                btypes.clear(type_clear?);
-            }
+        for type_clear in self.root
+            .lookup("relint.types.clear")
+            .unwrap_or(&nullArray)
+            .as_slice()
+            .ok_or_else(|| {
+                errors::ConfigError::Processing { desc: "Invalid field \"clear\"".to_string() }
+            })?
+            .iter()
+            .map(|s| force_as_str(s, "Type-to-clear")) {
+            btypes.clear(type_clear?);
         }
         Ok(btypes)
     }
