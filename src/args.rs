@@ -8,21 +8,13 @@ use std::fmt;
 use std::env;
 use std::error::Error as StdError;
 
+use lints;
 use atty;
 use errors;
 
 static CWD: &'static str = "./";
 static STDIN: &'static str = "-";
 static DEFAULT_CONFIG_FILE: &'static str = "relint.toml";
-
-arg_enum! {
-    #[derive(Debug)]
-    enum ErrorLevel {
-        Error,
-        Warning,
-        Info
-    }
-}
 
 struct PathWalkSource {
     paths: Vec<path::PathBuf>,
@@ -44,7 +36,7 @@ enum InputSource {
 
 pub struct App {
     input: InputSource,
-    lint_path: path::PathBuf,
+    pub lint_path: path::PathBuf,
 }
 
 impl PathWalkSource {
@@ -156,7 +148,7 @@ fn build_app<'a>() -> clap::App<'a, 'a> {
             .short("c")
             .help("Lints (searches up path if not specified)"))
         .arg(option("error-level", "LEVEL")
-            .possible_values(&ErrorLevel::variants())
+            .possible_values(&lints::ErrorLevel::variants())
             .default_value("Error")
             .help("Lint item level to be treated as errors"))
         .arg(flag("files-with-errors")

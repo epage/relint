@@ -5,6 +5,10 @@ use std::error;
 use std::path;
 use std::io;
 
+use ignore;
+use toml;
+use grep;
+
 #[derive(Debug)]
 pub enum ArgumentError {
     Clap(clap::Error),
@@ -40,19 +44,31 @@ impl From<clap::Error> for ArgumentError {
 
 #[derive(Debug)]
 pub enum ConfigError {
-    Io { err: io::Error, path: path::PathBuf },
+    Io(io::Error),
+    Toml(toml::ParserError),
+    Ignore(ignore::Error),
+    Grep(grep::Error),
+    Processing { desc: String },
 }
 
 impl error::Error for ConfigError {
     fn description(&self) -> &str {
         match *self {
-            ConfigError::Io { ref err, .. } => err.description(),
+            ConfigError::Io(ref err) => err.description(),
+            ConfigError::Toml(ref err) => err.description(),
+            ConfigError::Ignore(ref err) => err.description(),
+            ConfigError::Grep(ref err) => err.description(),
+            ConfigError::Processing { ref desc } => desc,
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            ConfigError::Io { ref err, .. } => Some(err),
+            ConfigError::Io(ref err) => Some(err),
+            ConfigError::Toml(ref err) => Some(err),
+            ConfigError::Ignore(ref err) => Some(err),
+            ConfigError::Grep(ref err) => Some(err),
+            ConfigError::Processing { .. } => None,
         }
     }
 }
@@ -60,8 +76,36 @@ impl error::Error for ConfigError {
 impl fmt::Display for ConfigError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ConfigError::Io { ref err, .. } => err.fmt(f),
+            ConfigError::Io(ref err) => err.fmt(f),
+            ConfigError::Toml(ref err) => err.fmt(f),
+            ConfigError::Ignore(ref err) => err.fmt(f),
+            ConfigError::Grep(ref err) => err.fmt(f),
+            ConfigError::Processing { ref desc } => desc.fmt(f),
         }
+    }
+}
+
+impl From<io::Error> for ConfigError {
+    fn from(err: io::Error) -> ConfigError {
+        ConfigError::Io(err)
+    }
+}
+
+impl From<toml::ParserError> for ConfigError {
+    fn from(err: toml::ParserError) -> ConfigError {
+        ConfigError::Toml(err)
+    }
+}
+
+impl From<ignore::Error> for ConfigError {
+    fn from(err: ignore::Error) -> ConfigError {
+        ConfigError::Ignore(err)
+    }
+}
+
+impl From<grep::Error> for ConfigError {
+    fn from(err: grep::Error) -> ConfigError {
+        ConfigError::Grep(err)
     }
 }
 

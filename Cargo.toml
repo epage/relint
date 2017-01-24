@@ -16,6 +16,9 @@ name = "relint"
 
 [dependencies]
 clap = "2.19"
+grep = "0.1.4"
+ignore = "0.1.5"
+toml = "0.2.1"
 
 [target.'cfg(windows)'.dependencies]
 kernel32-sys = "0.2.2"

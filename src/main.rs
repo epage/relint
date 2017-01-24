@@ -4,12 +4,16 @@ extern crate clap;
 extern crate kernel32;
 #[cfg(windows)]
 extern crate winapi;
+extern crate grep;
+extern crate ignore;
+extern crate toml;
 
 #[macro_use]
 mod macros;
 mod errors;
 mod args;
 mod atty;
+mod lints;
 
 use std::error::Error as StdError;
 
@@ -21,6 +25,7 @@ fn run() -> Result<(), Error> {
         None => return Ok(()),
     };
     let app = args::App::from_args(&matches)?;
+    let lints = lints::parse_toml_from_path(&app.lint_path)?;
     Ok(())
 }
 
