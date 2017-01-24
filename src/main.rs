@@ -30,7 +30,7 @@ fn run() -> Result<(), Error> {
 }
 
 fn failed(e: Error, code: i32) -> ! {
-    wlnerr!("{}", e.description());
+    wlnerr!("{}", e);
     std::process::exit(code)
 }
 

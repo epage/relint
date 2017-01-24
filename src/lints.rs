@@ -1,7 +1,5 @@
 extern crate clap;
 
-use std::vec;
-use std::slice;
 use std::path;
 use std::fs;
 use std::io::Read;
@@ -12,18 +10,18 @@ use toml;
 
 use errors;
 
-fn force_get<'a>(t: &'a toml::Table,
-                 field: &str,
-                 context: &str)
-                 -> Result<&'a toml::Value, errors::ConfigError> {
-    t.get(field).ok_or_else(|| {
-        errors::ConfigError::Processing { desc: format!("~{} is missing \"{}\"", context, field) }
-    })
+fn force_get<'a>(t: &'a toml::Table, field: &str) -> Result<&'a toml::Value, errors::FieldError> {
+    t.get(field)
+        .ok_or_else(|| errors::FieldError::new(field, errors::SpecificFieldError::MissingField))
 }
 
-fn force_as_str<'a>(v: &'a toml::Value, context: &str) -> Result<&'a str, errors::ConfigError> {
-    v.as_str().ok_or(errors::ConfigError::Processing {
-        desc: format!("{} ({}) needs to be a string", context, v),
+fn force_as_str<'a>(v: &'a toml::Value, field: &str) -> Result<&'a str, errors::FieldError> {
+    v.as_str().ok_or_else(|| {
+        errors::FieldError::new(field,
+                                errors::SpecificFieldError::FieldType {
+                                    expected: "string".to_string(),
+                                    actual: v.type_str().to_string(),
+                                })
     })
 }
 
@@ -33,35 +31,47 @@ struct FileTypeDef<'a> {
 }
 
 impl<'a> FileTypeDef<'a> {
-    fn new_from_value(typedef: &toml::Value) -> Result<FileTypeDef, errors::ConfigError> {
-        match *typedef {
-            toml::Value::Array(ref a) => {
-                if a.len() != 2 {
-                    return Err(errors::ConfigError::Processing {
-                        desc: format!("File type def ({}) requires [name, glob]", typedef),
-                    });
-                }
-                let name = force_as_str(&a[0], "File type def name")?;
-                let glob = force_as_str(&a[1], "File type def glob")?;
-                return Ok(FileTypeDef {
-                    name: name,
-                    glob: glob,
-                });
+    fn new_from_table(typedef: &toml::Table) -> Result<FileTypeDef, errors::FieldError> {
+        let name = force_get(&typedef, "name")?;
+        let name = force_as_str(name, "name")?;
+        let glob = force_get(&typedef, "glob")?;
+        let glob = force_as_str(glob, "glob")?;
+        return Ok(FileTypeDef {
+            name: name,
+            glob: glob,
+        });
+    }
+
+    fn new_from_array(typedef: &toml::Array) -> Result<FileTypeDef, errors::FieldError> {
+        match typedef.len() {
+            0 => {
+                Err(errors::FieldError::new("",
+                                            errors::SpecificFieldError::FieldType {
+                                                expected: "[name, glob]".to_string(),
+                                                actual: "[]".to_string(),
+                                            }))
             }
-            toml::Value::Table(ref t) => {
-                let name = force_as_str(force_get(&t, "name", "File type def")?,
-                                        "File type def name")?;
-                let glob = force_as_str(force_get(&t, "glob", "File type def")?,
-                                        "File type def glob")?;
-                return Ok(FileTypeDef {
+            1 => {
+                Err(errors::FieldError::new("",
+                                            errors::SpecificFieldError::FieldType {
+                                                expected: "[name, glob]".to_string(),
+                                                actual: "[name]".to_string(),
+                                            }))
+            }
+            2 => {
+                let name = force_as_str(&typedef[0], "0")?;
+                let glob = force_as_str(&typedef[1], "1")?;
+                Ok(FileTypeDef {
                     name: name,
                     glob: glob,
-                });
+                })
             }
             _ => {
-                return Err(errors::ConfigError::Processing {
-                    desc: format!("Invalid file type def: \"{}\"", typedef),
-                });
+                Err(errors::FieldError::new("",
+                                            errors::SpecificFieldError::FieldType {
+                                                expected: "[name, glob]".to_string(),
+                                                actual: "[name, glob, ...]".to_string(),
+                                            }))
             }
         }
     }
@@ -85,24 +95,26 @@ pub struct Lint {
 
 impl Lint {
     fn new_from_table(lint: &toml::Table,
-                      mut btypes: ignore::types::TypesBuilder,
-                      context: &str)
-                      -> Result<Lint, errors::ConfigError> {
+                      mut btypes: ignore::types::TypesBuilder)
+                      -> Result<Lint, errors::FieldError> {
         if let Some(types) = lint.get("type") {
             match *types {
                 toml::Value::String(ref s) => {
                     btypes.select(&s);
                 }
                 toml::Value::Array(ref a) => {
-                    for s in a.iter().map(|v| force_as_str(v, "type")) {
+                    for s in a.iter().map(|v| force_as_str(v, "type[...]")) {
                         let s = s?;
                         btypes.select(&s);
                     }
                 }
                 _ => {
-                    return Err(errors::ConfigError::Processing {
-                        desc: format!("{}: Invalid type: \"{}\"", context, types),
-                    });
+                    return Err(errors::FieldError::new("type-not",
+                                                       errors::SpecificFieldError::FieldType {
+                                                           expected: "string or string-array"
+                                                               .to_string(),
+                                                           actual: types.type_str().to_string(),
+                                                       }));
                 }
             }
         }
@@ -119,9 +131,12 @@ impl Lint {
                     }
                 }
                 _ => {
-                    return Err(errors::ConfigError::Processing {
-                        desc: format!("{}: Invalid type-not: \"{}\"", context, types),
-                    });
+                    return Err(errors::FieldError::new("type-not",
+                                                       errors::SpecificFieldError::FieldType {
+                                                           expected: "string or string-array"
+                                                               .to_string(),
+                                                           actual: types.type_str().to_string(),
+                                                       }));
                 }
             }
         }
@@ -130,27 +145,26 @@ impl Lint {
             lint.get("severity").map(|s| force_as_str(s, "severity")).unwrap_or(Ok("error"))?;
         let severity = severity.parse::<ErrorLevel>()
             .map_err(|s| {
-                errors::ConfigError::Processing {
-                    desc: format!("{}: Invalid severity: \"{}\"", context, s),
-                }
+                errors::FieldError::new("severity",
+                                        errors::SpecificFieldError::FieldType {
+                                            expected: s,
+                                            actual: severity.to_string(),
+                                        })
             })?;
 
-        let message = lint.get("message")
-            .ok_or(errors::ConfigError::Processing {
-                desc: format!("{}: Missing \"message\"", context),
-            })?;
+        let message = force_get(lint, "message")?;
         let message = force_as_str(message, "message")?.as_bytes().to_vec();
 
-        let pattern = lint.get("pattern")
-            .ok_or(errors::ConfigError::Processing {
-                desc: format!("{}: Missing \"pattern\"", context),
-            })?;
+        let pattern = force_get(lint, "pattern")?;
         let pattern = force_as_str(pattern, "pattern")?;
         let bpattern = grep::GrepBuilder::new(pattern);
-        let pattern = bpattern.build()?;
+        let pattern = bpattern.build()
+            .map_err(|e| errors::FieldError::new("severity", errors::SpecificFieldError::Grep(e)))?;
 
         Ok(Lint {
-            types: btypes.build()?,
+            types:
+                btypes.build()
+                .map_err(|e| errors::FieldError::new("...", errors::SpecificFieldError::Ignore(e)))?,
             severity: severity,
             message: message,
             pattern: pattern,
@@ -163,52 +177,95 @@ pub struct TomlLintFactory {
 }
 
 impl TomlLintFactory {
-    // TODO: compose errors to add context as the stack unwinds
     pub fn new(content: &str) -> Result<TomlLintFactory, errors::ConfigError> {
         let mut parser = toml::Parser::new(content);
         let root = parser.parse()
-            .ok_or_else(|| errors::ConfigError::Toml(parser.errors.swap_remove(0)))?;
+            .ok_or_else(|| parser.errors.swap_remove(0))?;
 
         Ok(TomlLintFactory { root: toml::Value::Table(root) })
     }
 
     pub fn new_from_path(lint_path: &path::Path) -> Result<TomlLintFactory, errors::ConfigError> {
-        let mut f = fs::File::open(lint_path)?;
+        let mut f = fs::File::open(lint_path).map_err(|e| {
+                errors::ConfigError::from(e).add_path(lint_path.to_string_lossy().to_string())
+            })?;
         let mut content = String::new();
-        f.read_to_string(&mut content)?;
+        f.read_to_string(&mut content)
+            .map_err(|e| {
+                errors::ConfigError::from(e).add_path(lint_path.to_string_lossy().to_string())
+            })?;
         TomlLintFactory::new(&content)
     }
 
     pub fn build_types(&self) -> Result<ignore::types::TypesBuilder, errors::ConfigError> {
         let mut btypes = ignore::types::TypesBuilder::new();
         btypes.add_defaults();
-        let nullArray = toml::Value::Array(Vec::new());
-        for def in self.root
+        let null_array = toml::Value::Array(Vec::new());
+        let adds = self.root
             .lookup("relint.types.add")
-            .unwrap_or(&nullArray)
-            .as_slice()
+            .unwrap_or(&null_array);
+        let adds = adds.as_slice()
             .ok_or_else(|| {
-                errors::ConfigError::Processing { desc: "Invalid field \"add\"".to_string() }
-            })?
-            .iter()
-            .map(FileTypeDef::new_from_value) {
-            let def = def?;
+                errors::FieldError::new("relint.types.add",
+                                        errors::SpecificFieldError::FieldType {
+                                            expected: "array".to_string(),
+                                            actual: adds.type_str().to_string(),
+                                        })
+            })?;
+        for def in adds {
+            let def = match *def {
+                toml::Value::Table(ref t) => FileTypeDef::new_from_table(t),
+                toml::Value::Array(ref a) => FileTypeDef::new_from_array(a),
+                _ => {
+                    Err(errors::FieldError::new("relint.types.add[...]",
+                                                errors::SpecificFieldError::FieldType {
+                                                    expected: "table/array".to_string(),
+                                                    actual: def.type_str().to_string(),
+                                                }))
+                }
+            }?;
             let name = def.name;
             let glob = def.glob;
-            btypes.add(name, glob)?;
+            btypes.add(name, glob)
+                .map_err(|e| {
+                    errors::FieldError::new("relint.types.add[...]",
+                                            errors::SpecificFieldError::Ignore(e))
+                })?;
         }
-        for type_clear in self.root
+        let clears = self.root
             .lookup("relint.types.clear")
-            .unwrap_or(&nullArray)
-            .as_slice()
+            .unwrap_or(&null_array);
+        let clears = clears.as_slice()
             .ok_or_else(|| {
-                errors::ConfigError::Processing { desc: "Invalid field \"clear\"".to_string() }
-            })?
-            .iter()
-            .map(|s| force_as_str(s, "Type-to-clear")) {
+                errors::FieldError::new("relint.types.clear",
+                                        errors::SpecificFieldError::FieldType {
+                                            expected: "array".to_string(),
+                                            actual: clears.type_str().to_string(),
+                                        })
+            })?;
+        for type_clear in clears.iter()
+            .map(|s| force_as_str(s, "relint.types.clear[...]")) {
             btypes.clear(type_clear?);
         }
         Ok(btypes)
+    }
+
+    fn build_lint(&self,
+                  check_name: &str,
+                  settings: &toml::Value)
+                  -> Result<Lint, errors::ConfigError> {
+        // TODO make ignore::types::TypesBuilder cloneable
+        let btypes = self.build_types()?;
+        let settings = settings.as_table()
+            .ok_or_else(|| {
+                errors::FieldError::new(check_name,
+                                        errors::SpecificFieldError::FieldType {
+                                            expected: "table".to_string(),
+                                            actual: settings.type_str().to_string(),
+                                        })
+            })?;
+        let lint = Lint::new_from_table(settings, btypes)?;
+        Ok(lint)
     }
 
     pub fn build_lints(&self) -> Result<Vec<Lint>, errors::ConfigError> {
@@ -217,18 +274,7 @@ impl TomlLintFactory {
             .expect("Table magically became not-a-table?")
             .iter()
             .filter(|kv| kv.0 != "relint")
-            .map(|kv| {
-                // TODO make ignore::types::TypesBuilder cloneable
-                let btypes = self.build_types()?;
-                let table = kv.1
-                    .as_table()
-                    .ok_or_else(|| {
-                        errors::ConfigError::Processing {
-                            desc: format!("Invalid field \"{}\"", kv.0),
-                        }
-                    })?;
-                Lint::new_from_table(table, btypes, kv.0)
-            })
+            .map(|kv| self.build_lint(kv.0, kv.1))
             .collect();
         lints
     }
