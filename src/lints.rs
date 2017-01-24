@@ -142,7 +142,7 @@ impl Lint {
         }
 
         let severity =
-            lint.get("severity").map(|s| force_as_str(s, "severity")).unwrap_or(Ok("error"))?;
+            lint.get("severity").map(|s| force_as_str(s, "severity")).unwrap_or(Ok("Error"))?;
         let severity = severity.parse::<ErrorLevel>()
             .map_err(|s| {
                 errors::FieldError::new("severity",
