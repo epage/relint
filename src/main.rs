@@ -30,16 +30,16 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-fn failed(e: Error, code: i32) -> ! {
-    wlnerr!("{}", e);
-    std::process::exit(code)
-}
-
 fn main() {
-    if let Err(e) = run() {
-        match e {
-            Error::Argument { .. } => failed(e, 2),
-            Error::Config { .. } => failed(e, 3),
+    match run() {
+        Ok(_) => {}
+        Err(Error::Argument(ref e)) => {
+            wlnerr!("{}", e);
+            std::process::exit(2)
+        }
+        Err(Error::Config(ref e)) => {
+            wlnerr!("{}", e);
+            std::process::exit(3)
         }
     }
 }
