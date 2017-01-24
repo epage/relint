@@ -26,12 +26,9 @@ struct PathWalkSource {
     threads: usize,
 }
 
-struct StdInSource {
-}
-
 enum InputSource {
     PathWalk(PathWalkSource),
-    StdIn(StdInSource),
+    StdIn,
 }
 
 pub struct App {
@@ -56,13 +53,6 @@ impl PathWalkSource {
     }
 }
 
-impl StdInSource {
-    fn from_args(matches: &clap::ArgMatches) -> Result<StdInSource, errors::ArgumentError> {
-        let source = StdInSource {};
-        Ok(source)
-    }
-}
-
 impl InputSource {
     fn from_args(matches: &clap::ArgMatches) -> Result<InputSource, errors::ArgumentError> {
         let paths: Vec<path::PathBuf> = match matches.values_of("path") {
@@ -70,7 +60,7 @@ impl InputSource {
             Some(vals) => vals.map(|p| path::Path::new(p).to_path_buf()).collect(),
         };
         if is_stdin_requested(&paths)? {
-            return Ok(InputSource::StdIn(StdInSource::from_args(matches)?));
+            return Ok(InputSource::StdIn);
         } else {
             return Ok(InputSource::PathWalk(PathWalkSource::from_args(paths, matches)?));
         }
