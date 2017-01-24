@@ -25,7 +25,7 @@ fn run() -> Result<(), Error> {
         None => return Ok(()),
     };
     let app = args::App::from_args(&matches)?;
-    let lints = lints::parse_toml_from_path(&app.lint_path)?;
+    let lints = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
     Ok(())
 }
 
