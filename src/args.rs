@@ -16,6 +16,8 @@ static CWD: &'static str = "./";
 static STDIN: &'static str = "-";
 static DEFAULT_CONFIG_FILE: &'static str = "relint.toml";
 
+#[derive(Debug)]
+#[derive(Eq, PartialEq)]
 pub struct PathWalkSource {
     paths: Vec<path::PathBuf>,
     follow: bool,
@@ -43,6 +45,8 @@ impl PathWalkSource {
     }
 }
 
+#[derive(Debug)]
+#[derive(Eq, PartialEq)]
 pub enum SearchInput {
     PathWalk(PathWalkSource),
     StdIn,
@@ -62,6 +66,8 @@ impl SearchInput {
     }
 }
 
+#[derive(Debug)]
+#[derive(Eq, PartialEq)]
 pub enum SearchOutput {
     None,
     Message,
@@ -84,6 +90,7 @@ impl SearchOutput {
     }
 }
 
+#[derive(Debug)]
 pub enum Action {
     Search {
         input: SearchInput,
@@ -98,14 +105,20 @@ impl Action {
         let action = if matches.is_present("type-list") {
             Action::PrintTypes
         } else {
+            let input = SearchInput::from_args(matches)?;
             let min_severity = matches.value_of("error-level")
                 .expect("Default should cover this")
                 .parse::<lints::ErrorLevel>()
                 .expect("Should be validated");
+            let output = SearchOutput::from_args(matches)?;
+            if input == SearchInput::StdIn && output == SearchOutput::None {
+                return Err(clap::Error::with_description("Cannot mix stdin (-) with --files",
+                                                         clap::ErrorKind::ArgumentConflict))?;
+            }
             Action::Search {
-                input: SearchInput::from_args(matches)?,
+                input: input,
                 min_severity: min_severity,
-                output: SearchOutput::from_args(matches)?,
+                output: output,
             }
         };
 
@@ -113,6 +126,7 @@ impl Action {
     }
 }
 
+#[derive(Debug)]
 pub struct Printer {
     pub quiet: bool,
     pub null: bool,
@@ -127,6 +141,7 @@ impl Printer {
     }
 }
 
+#[derive(Debug)]
 pub struct App {
     pub action: Action,
     pub printer: Printer,
