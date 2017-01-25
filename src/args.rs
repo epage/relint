@@ -43,6 +43,11 @@ impl PathWalkSource {
         };
         Ok(source)
     }
+
+    /// If true, ignore threads
+    fn is_one_path(&self) -> bool {
+        self.paths.len() == 1 && self.paths[0].is_file()
+    }
 }
 
 #[derive(Debug)]
