@@ -172,32 +172,47 @@ impl Lint {
     }
 }
 
-pub struct TomlLintFactory {
+pub struct TomlLintFactory<'a> {
     root: toml::Value,
+    lint_path: Option<&'a path::Path>,
 }
 
-impl TomlLintFactory {
+impl<'a> TomlLintFactory<'a> {
     pub fn new(content: &str) -> Result<TomlLintFactory, errors::ConfigError> {
         let mut parser = toml::Parser::new(content);
         let root = parser.parse()
             .ok_or_else(|| parser.errors.swap_remove(0))?;
 
-        Ok(TomlLintFactory { root: toml::Value::Table(root) })
+        Ok(TomlLintFactory {
+            root: toml::Value::Table(root),
+            lint_path: None,
+        })
     }
 
     pub fn new_from_path(lint_path: &path::Path) -> Result<TomlLintFactory, errors::ConfigError> {
         let mut f = fs::File::open(lint_path).map_err(|e| {
-                errors::ConfigError::from(e).add_path(lint_path.to_string_lossy().to_string())
+                errors::ConfigError::from(e).add_path(Some(lint_path))
             })?;
         let mut content = String::new();
         f.read_to_string(&mut content)
-            .map_err(|e| {
-                errors::ConfigError::from(e).add_path(lint_path.to_string_lossy().to_string())
-            })?;
+            .map_err(|e| errors::ConfigError::from(e).add_path(Some(lint_path)))?;
         TomlLintFactory::new(&content)
+            .map(|f| {
+                TomlLintFactory {
+                    root: f.root,
+                    lint_path: Some(lint_path),
+                }
+            })
+            .map_err(|e| errors::ConfigError::from(e).add_path(Some(lint_path)))
     }
 
-    pub fn build_types(&self) -> Result<ignore::types::TypesBuilder, errors::ConfigError> {
+    pub fn build_types(&self) -> Result<ignore::types::Types, errors::ConfigError> {
+        self.build_type_builder()?
+            .build()
+            .map_err(|e| errors::ConfigError::from(e).add_path(self.lint_path))
+    }
+
+    fn build_type_builder(&self) -> Result<ignore::types::TypesBuilder, errors::ConfigError> {
         let mut btypes = ignore::types::TypesBuilder::new();
         btypes.add_defaults();
         let null_array = toml::Value::Array(Vec::new());
@@ -255,7 +270,7 @@ impl TomlLintFactory {
                   settings: &toml::Value)
                   -> Result<Lint, errors::ConfigError> {
         // TODO make ignore::types::TypesBuilder cloneable
-        let btypes = self.build_types()?;
+        let btypes = self.build_type_builder()?;
         let settings = settings.as_table()
             .ok_or_else(|| {
                 errors::FieldError::new(check_name,
@@ -276,6 +291,6 @@ impl TomlLintFactory {
             .filter(|kv| kv.0 != "relint")
             .map(|kv| self.build_lint(kv.0, kv.1))
             .collect();
-        lints
+        lints.map_err(|e| errors::ConfigError::from(e).add_path(self.lint_path))
     }
 }

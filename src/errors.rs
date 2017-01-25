@@ -136,6 +136,7 @@ pub enum SpecificConfigError {
     Field(FieldError),
     Io(io::Error),
     Toml(toml::ParserError),
+    Ignore(ignore::Error),
 }
 
 impl error::Error for SpecificConfigError {
@@ -148,6 +149,7 @@ impl error::Error for SpecificConfigError {
             SpecificConfigError::Field(ref err) => Some(err),
             SpecificConfigError::Io(ref err) => Some(err),
             SpecificConfigError::Toml(ref err) => Some(err),
+            SpecificConfigError::Ignore(ref err) => Some(err),
         }
     }
 }
@@ -158,6 +160,7 @@ impl fmt::Display for SpecificConfigError {
             SpecificConfigError::Io(ref err) => err.fmt(f),
             SpecificConfigError::Field(ref err) => err.fmt(f),
             SpecificConfigError::Toml(ref err) => err.fmt(f),
+            SpecificConfigError::Ignore(ref err) => err.fmt(f),
         }
     }
 }
@@ -169,9 +172,9 @@ pub struct ConfigError {
 }
 
 impl ConfigError {
-    pub fn add_path(self, file: String) -> ConfigError {
+    pub fn add_path(self, file: Option<&path::Path>) -> ConfigError {
         ConfigError {
-            file: Some(file),
+            file: file.map(|p| p.to_string_lossy().to_string()),
             error: self.error,
         }
     }
@@ -219,6 +222,15 @@ impl From<toml::ParserError> for ConfigError {
         ConfigError {
             file: None,
             error: SpecificConfigError::Toml(err),
+        }
+    }
+}
+
+impl From<ignore::Error> for ConfigError {
+    fn from(err: ignore::Error) -> ConfigError {
+        ConfigError {
+            file: None,
+            error: SpecificConfigError::Ignore(err),
         }
     }
 }
