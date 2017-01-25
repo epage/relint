@@ -2,6 +2,8 @@ relint
 ------------
 `relint` is a line oriented lint tool with support for fixing issues.
 
+[![Linux build status](https://travis-ci.org/epage/relint.svg?branch=master)](https://travis-ci.org/epage/relint) [![](https://tokei.rs/b1/github/epage/relint)](https://github.com/epage/relint)
+
 Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 ### Installation
