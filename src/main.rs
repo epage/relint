@@ -44,7 +44,13 @@ fn run() -> Result<(), Error> {
     let stdout = std::io::stdout();
     let mut printer = match app.printer.quiet {
         true => None,
-        false => Some(printer::IoPrinter::new(stdout.lock())),
+        false => {
+            let mut printer = printer::IoPrinter::new(stdout.lock());
+            if app.printer.null {
+                printer = printer.null();
+            }
+            Some(printer)
+        }
     };
 
     match app.action {
