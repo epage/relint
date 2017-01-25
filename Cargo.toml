@@ -5,8 +5,8 @@ authors = [ "Ed Page <eopage@byu.net>" ]
 description = """
 Regular expression based code linting
 """
-documentation = "https:github.com/epage/relint"
-homepage = "https:github.com/epage/relint"
+documentation = "https://github.com/epage/relint"
+homepage = "https://github.com/epage/relint"
 readme = "README.md"
 keywords = ["regex", "lint"]
 license = "Unlicense/MIT"
