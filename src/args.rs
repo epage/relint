@@ -43,42 +43,107 @@ impl PathWalkSource {
     }
 }
 
-enum InputSource {
+enum SearchInput {
     PathWalk(PathWalkSource),
     StdIn,
 }
 
-impl InputSource {
-    fn from_args(matches: &clap::ArgMatches) -> Result<InputSource, errors::ArgumentError> {
+impl SearchInput {
+    fn from_args(matches: &clap::ArgMatches) -> Result<SearchInput, errors::ArgumentError> {
         let paths: Vec<path::PathBuf> = match matches.values_of("path") {
             None => vec![default_path()],
             Some(vals) => vals.map(|p| path::Path::new(p).to_path_buf()).collect(),
         };
         if is_stdin_requested(&paths)? {
-            return Ok(InputSource::StdIn);
+            return Ok(SearchInput::StdIn);
         } else {
-            return Ok(InputSource::PathWalk(PathWalkSource::from_args(paths, matches)?));
+            return Ok(SearchInput::PathWalk(PathWalkSource::from_args(paths, matches)?));
         }
     }
 }
 
+enum SearchOutput {
+    None,
+    Message,
+    File { matched: bool },
+}
+
+impl SearchOutput {
+    fn from_args(matches: &clap::ArgMatches) -> Result<SearchOutput, errors::ArgumentError> {
+        let output = if matches.is_present("files") {
+            SearchOutput::None
+        } else if matches.is_present("files-with-errors") {
+            SearchOutput::File { matched: true }
+        } else if matches.is_present("files-without-errors") {
+            SearchOutput::File { matched: false }
+        } else {
+            SearchOutput::Message
+        };
+
+        Ok(output)
+    }
+}
+
+pub enum Action {
+    Search {
+        input: SearchInput,
+        min_severity: lints::ErrorLevel,
+        output: SearchOutput,
+    },
+    PrintTypes,
+}
+
+impl Action {
+    fn from_args(matches: &clap::ArgMatches) -> Result<Action, errors::ArgumentError> {
+        let action = if matches.is_present("type-list") {
+            Action::PrintTypes
+        } else {
+            let min_severity = matches.value_of("error-level")
+                .expect("Default should cover this")
+                .parse::<lints::ErrorLevel>()
+                .expect("Should be validated");
+            Action::Search {
+                input: SearchInput::from_args(matches)?,
+                min_severity: min_severity,
+                output: SearchOutput::from_args(matches)?,
+            }
+        };
+
+        Ok(action)
+    }
+}
+
+pub struct Printer {
+    pub quiet: bool,
+    pub null: bool,
+}
+
+impl Printer {
+    fn from_args(matches: &clap::ArgMatches) -> Result<Printer, errors::ArgumentError> {
+        Ok(Printer {
+            quiet: matches.is_present("quiet"),
+            null: matches.is_present("null"),
+        })
+    }
+}
+
 pub struct App {
-    input: InputSource,
+    pub action: Action,
+    pub printer: Printer,
     pub lint_path: path::PathBuf,
 }
 
 impl App {
     pub fn from_args(matches: &clap::ArgMatches) -> Result<App, errors::ArgumentError> {
+        let action = Action::from_args(&matches)?;
+        let printer = Printer::from_args(matches)?;
         let lint_path = get_project_file(&matches, "lints", DEFAULT_CONFIG_FILE)?;
 
-        let input_source = InputSource::from_args(&matches)?;
-
-        let app = App {
-            input: input_source,
+        Ok(App {
+            action: action,
+            printer: printer,
             lint_path: lint_path,
-        };
-
-        Ok(app)
+        })
     }
 }
 
@@ -114,14 +179,18 @@ fn parsed_value_of<F: str::FromStr>(matches: &clap::ArgMatches,
 }
 
 fn build_app<'a>() -> clap::App<'a, 'a> {
-    clap::App::new("relint")
+    let mut args = clap::App::new("relint")
         .version(crate_version!())
         .author(crate_authors!())
-        .about("Custom linting through regular expressions")
-        .arg(arg("path")
+        .about("Custom linting through regular expressions");
+
+    args = args.arg(arg("path")
             .multiple(true)
             .default_value(CWD)
             .help("Specify '-' for stdin"))
+        .group(clap::ArgGroup::with_name("Paths")
+            .args(&["follow", "hidden", "no-ignore", "no-ignore-vcs", "maxdepth", "threads"])
+            .multiple(true))
         .arg(flag("follow")
             .short("L")
             .help("Follow symbolic links."))
@@ -131,34 +200,40 @@ fn build_app<'a>() -> clap::App<'a, 'a> {
         .arg(option("maxdepth", "NUM")
             .validator(validate_number)
             .help("Descend at most NUM directories."))
-        .group(clap::ArgGroup::with_name("Paths")
-            .args(&["follow", "no-ignore", "no-ignore-vcs", "maxdepth"])
-            .multiple(true))
-        .arg(option("lints", "FILE")
-            .short("c")
-            .help("Lints (searches up path if not specified)"))
-        .arg(option("error-level", "LEVEL")
-            .possible_values(&lints::ErrorLevel::variants())
-            .default_value("Error")
-            .help("Lint item level to be treated as errors"))
+        .arg(option("threads", "NUM")
+            .short("j")
+            .validator(validate_number));
+
+    args = args.arg(option("lints", "FILE")
+        .short("c")
+        .help("Lints (searches up path if not specified)"));
+
+    args = args.group(clap::ArgGroup::with_name("PrintNames")
+            .args(&["files", "files-with-errors", "files-without-errors"]))
         .arg(flag("files-with-errors")
             .short("l")
             .help("Only show the path of each file with at least one match."))
         .arg(flag("files-without-errors")
             .help("Only show the path of each file that contains zero matches."))
         .arg(flag("files").help("Print each file that would be searched."))
-        .group(clap::ArgGroup::with_name("PrintNames")
-            .args(&["files", "files-with-errors", "files-without-errors"]))
         .arg(flag("null")
             .requires("PrintNames")
-            .help("Print NUL byte after file names"))
-        .arg(flag("quiet")
+            .help("Print NUL byte after file names"));
+
+    args = args.arg(option("error-level", "LEVEL")
+        .possible_values(&lints::ErrorLevel::variants())
+        .default_value("Error")
+        .help("Lint item level to be treated as errors"));
+
+    args = args.arg(flag("quiet")
             .short("q")
+            .conflicts_with_all(&["PrintNames", "type-list"])
             .help("Do not print any result"))
-        .arg(flag("type-list").help("Show all supported file types."))
-        .arg(option("threads", "NUM")
-            .short("j")
-            .validator(validate_number))
+        .arg(flag("type-list")
+            .conflicts_with("PrintNames")
+            .help("Show all supported file types."));
+
+    args
 }
 
 pub fn parse_args<'a>() -> Result<Option<clap::ArgMatches<'a>>, errors::ArgumentError> {

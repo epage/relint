@@ -14,10 +14,24 @@ mod errors;
 mod args;
 mod atty;
 mod lints;
+mod printer;
 
+use std::io;
 use std::error::Error as StdError;
 
 use errors::Error;
+
+fn run_types<W: io::Write>(printer: &mut Option<&mut printer::IoPrinter<W>>,
+                           type_defs: &[ignore::types::FileTypeDef])
+                           -> Result<(), Error> {
+    for def in type_defs {
+        match *printer {
+            Some(ref mut p) => p.type_def(def),
+            None => {}
+        }
+    }
+    Ok(())
+}
 
 fn run() -> Result<(), Error> {
     let matches = match args::parse_args()? {
@@ -26,8 +40,25 @@ fn run() -> Result<(), Error> {
     };
     let app = args::App::from_args(&matches)?;
     let factory = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
-    let lints = factory.build_lints()?;
-    Ok(())
+
+    let stdout = std::io::stdout();
+    let mut printer = match app.printer.quiet {
+        true => None,
+        false => Some(printer::IoPrinter::new(stdout.lock())),
+    };
+
+    match app.action {
+        args::Action::Search { input: ref input,
+                               min_severity: ref min_severity,
+                               output: ref output } => {
+            let lints = factory.build_lints()?;
+            Ok(())
+        }
+        args::Action::PrintTypes => {
+            let types = factory.build_types()?;
+            run_types(&mut printer.as_mut(), types.definitions())
+        }
+    }
 }
 
 fn main() {
