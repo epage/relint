@@ -68,7 +68,7 @@ impl error::Error for SpecificFieldError {
 impl fmt::Display for SpecificFieldError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SpecificFieldError::FieldType { expected: ref expected, actual: ref actual } => {
+            SpecificFieldError::FieldType { ref expected, ref actual } => {
                 write!(f,
                        "Incorrect type: expected '{}', actual '{}'",
                        expected,

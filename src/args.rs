@@ -16,7 +16,7 @@ static CWD: &'static str = "./";
 static STDIN: &'static str = "-";
 static DEFAULT_CONFIG_FILE: &'static str = "relint.toml";
 
-struct PathWalkSource {
+pub struct PathWalkSource {
     paths: Vec<path::PathBuf>,
     follow: bool,
     hidden: bool,
@@ -43,7 +43,7 @@ impl PathWalkSource {
     }
 }
 
-enum SearchInput {
+pub enum SearchInput {
     PathWalk(PathWalkSource),
     StdIn,
 }
@@ -62,7 +62,7 @@ impl SearchInput {
     }
 }
 
-enum SearchOutput {
+pub enum SearchOutput {
     None,
     Message,
     File { matched: bool },
@@ -269,7 +269,7 @@ fn get_project_file(matches: &clap::ArgMatches,
     let cwd = env::current_dir().expect("How does this fail?");
     let path = matches.value_of(name)
         .map(|p| Some(path::Path::new(p).to_path_buf()))
-        .unwrap_or_else(|| find_project_file(cwd.as_path(), DEFAULT_CONFIG_FILE))
+        .unwrap_or_else(|| find_project_file(cwd.as_path(), default))
         .ok_or_else(|| {
             clap::Error::with_description(&format!("The following required argument was not \
                                                     provided: --{}",

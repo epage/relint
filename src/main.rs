@@ -17,7 +17,6 @@ mod lints;
 mod printer;
 
 use std::io;
-use std::error::Error as StdError;
 
 use errors::Error;
 
@@ -54,9 +53,7 @@ fn run() -> Result<(), Error> {
     };
 
     match app.action {
-        args::Action::Search { input: ref input,
-                               min_severity: ref min_severity,
-                               output: ref output } => {
+        args::Action::Search { ref input, ref min_severity, ref output } => {
             let lints = factory.build_lints()?;
             Ok(())
         }
