@@ -1,10 +1,27 @@
 use std::io;
+use std::path;
 
 use ignore;
+
+use ripgrep_stolen::pathutil;
 
 pub struct IoPrinter<W> {
     writer: W,
     sep: u8,
+}
+
+#[cfg(unix)]
+fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
+    use std::os::unix::ffi::OsStrExt;
+
+    path.as_os_str().as_bytes()
+}
+
+static PLACEHOLDER: &'static str = "<INVALID>";
+
+#[cfg(not(unix))]
+fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
+    path.to_str().unwrap_or(PLACEHOLDER).as_bytes()
 }
 
 impl<W: io::Write> IoPrinter<W> {
@@ -31,6 +48,11 @@ impl<W: io::Write> IoPrinter<W> {
             self.write(glob.as_bytes());
             first = false;
         }
+        self.write_sep();
+    }
+
+    pub fn path(&mut self, path: &path::Path) {
+        self.write(path_bytes(pathutil::strip_prefix("./", path).unwrap_or(path)));
         self.write_sep();
     }
 

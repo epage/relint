@@ -87,10 +87,10 @@ arg_enum! {
 }
 
 pub struct Lint {
-    types: ignore::types::Types,
-    severity: ErrorLevel,
-    pattern: grep::Grep,
-    message: Vec<u8>,
+    pub types: ignore::types::Types,
+    pub severity: ErrorLevel,
+    pub pattern: grep::Grep,
+    pub message: Vec<u8>,
 }
 
 impl Lint {

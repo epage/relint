@@ -18,25 +18,29 @@ static DEFAULT_CONFIG_FILE: &'static str = "relint.toml";
 
 #[derive(Debug)]
 #[derive(Eq, PartialEq)]
-pub struct PathWalkSource {
-    paths: Vec<path::PathBuf>,
-    follow: bool,
-    hidden: bool,
-    no_ignore: bool,
-    no_ignore_vcs: bool,
-    maxdepth: Option<usize>,
-    threads: usize,
+pub struct SearchInput {
+    pub paths: Vec<path::PathBuf>,
+    pub follow: bool,
+    pub hidden: bool,
+    pub no_ignore: bool,
+    pub no_ignore_parent: bool,
+    pub no_ignore_vcs: bool,
+    pub maxdepth: Option<usize>,
+    pub threads: usize,
 }
 
-impl PathWalkSource {
-    fn from_args(paths: Vec<path::PathBuf>,
-                 matches: &clap::ArgMatches)
-                 -> Result<PathWalkSource, errors::ArgumentError> {
-        let source = PathWalkSource {
+impl SearchInput {
+    fn from_args(matches: &clap::ArgMatches) -> Result<SearchInput, errors::ArgumentError> {
+        let paths = match matches.values_of("path") {
+            None => vec![default_path()],
+            Some(vals) => vals.map(|p| path::Path::new(p).to_path_buf()).collect(),
+        };
+        let source = SearchInput {
             paths: paths,
             follow: matches.is_present("follow"),
             hidden: matches.is_present("hidden"),
             no_ignore: matches.is_present("no-ignore"),
+            no_ignore_parent: matches.is_present("no-ignore-parent"),
             no_ignore_vcs: matches.is_present("no-ignore-vcs"),
             maxdepth: parsed_value_of(matches, "maxdepth")?,
             threads: parsed_value_of(matches, "threads")?.unwrap_or(0),
@@ -45,29 +49,8 @@ impl PathWalkSource {
     }
 
     /// If true, ignore threads
-    fn is_one_path(&self) -> bool {
+    pub fn is_one_path(&self) -> bool {
         self.paths.len() == 1 && self.paths[0].is_file()
-    }
-}
-
-#[derive(Debug)]
-#[derive(Eq, PartialEq)]
-pub enum SearchInput {
-    PathWalk(PathWalkSource),
-    StdIn,
-}
-
-impl SearchInput {
-    fn from_args(matches: &clap::ArgMatches) -> Result<SearchInput, errors::ArgumentError> {
-        let paths: Vec<path::PathBuf> = match matches.values_of("path") {
-            None => vec![default_path()],
-            Some(vals) => vals.map(|p| path::Path::new(p).to_path_buf()).collect(),
-        };
-        if is_stdin_requested(&paths)? {
-            return Ok(SearchInput::StdIn);
-        } else {
-            return Ok(SearchInput::PathWalk(PathWalkSource::from_args(paths, matches)?));
-        }
     }
 }
 
@@ -116,10 +99,6 @@ impl Action {
                 .parse::<lints::ErrorLevel>()
                 .expect("Should be validated");
             let output = SearchOutput::from_args(matches)?;
-            if input == SearchInput::StdIn && output == SearchOutput::None {
-                return Err(clap::Error::with_description("Cannot mix stdin (-) with --files",
-                                                         clap::ErrorKind::ArgumentConflict))?;
-            }
             Action::Search {
                 input: input,
                 min_severity: min_severity,
@@ -216,6 +195,7 @@ fn build_app<'a>() -> clap::App<'a, 'a> {
             .help("Follow symbolic links."))
         .arg(flag("hidden").help("Search hidden files and directories."))
         .arg(flag("no-ignore").help("Don't respect ignore files."))
+        .arg(flag("no-ignore-parent").help("Don't respect ignore files in parent directories."))
         .arg(flag("no-ignore-vcs").help("Don't respect VCS ignore files"))
         .arg(option("maxdepth", "NUM")
             .validator(validate_number)
@@ -306,17 +286,4 @@ fn default_path() -> path::PathBuf {
         false => STDIN,
     };
     path::Path::new(default_path).to_path_buf()
-}
-
-fn is_stdin_requested(paths: &[path::PathBuf]) -> Result<bool, errors::ArgumentError> {
-    if paths.len() == 1 {
-        return Ok(paths[0] == path::Path::new(STDIN));
-    } else {
-        let stdin_path = path::Path::new(STDIN).to_path_buf();
-        if paths.contains(&stdin_path) {
-            return Err(clap::Error::with_description("Cannot mix stdin (-) with file paths",
-                                                     clap::ErrorKind::ArgumentConflict))?;
-        }
-        return Ok(false);
-    }
 }
