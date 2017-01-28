@@ -12,7 +12,7 @@ extern crate toml;
 mod macros;
 mod errors;
 mod args;
-mod atty;
+mod ripgrep_stolen;
 mod lints;
 mod printer;
 

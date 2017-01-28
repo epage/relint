@@ -9,7 +9,7 @@ use std::env;
 use std::error::Error as StdError;
 
 use lints;
-use atty;
+use ripgrep_stolen::atty;
 use errors;
 
 static CWD: &'static str = "./";
