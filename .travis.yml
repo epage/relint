@@ -22,17 +22,17 @@ matrix:
     # - env: TARGET=x86_64-unknown-linux-gnu # default
 
     # OSX
-    - env: TARGET=i686-apple-darwin
-      os: osx
-    - env: TARGET=x86_64-apple-darwin
-      os: osx
+    #- env: TARGET=i686-apple-darwin
+    #  os: osx
+    #- env: TARGET=x86_64-apple-darwin
+    #  os: osx
 
     # Testing other channels
     - env: TARGET=x86_64-unknown-linux-gnu
       rust: nightly
-    - env: TARGET=x86_64-apple-darwin
-      os: osx
-      rust: nightly
+    #- env: TARGET=x86_64-apple-darwin
+    #  os: osx
+    #  rust: nightly
 
 before_install: set -e
 
