@@ -7,6 +7,7 @@ extern crate winapi;
 extern crate grep;
 extern crate ignore;
 extern crate toml;
+extern crate libc;
 
 #[macro_use]
 mod macros;
