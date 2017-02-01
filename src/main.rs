@@ -60,7 +60,7 @@ fn run_types<W: io::Write>(printer: &mut Option<&mut printer::IoPrinter<W>>,
 }
 
 fn run_file_one_thread<W: io::Write>(printer: &mut Option<&mut printer::IoPrinter<W>>,
-                                     mut walker: ignore::Walk,
+                                     walker: ignore::Walk,
                                      lints: &[lints::Lint])
                                      -> Result<(), Error> {
     for result in walker {
@@ -122,9 +122,9 @@ fn run() -> Result<(), Error> {
             match *output {
                 args::SearchOutput::None => {
                     if input.threads == 1 || input.is_one_path() {
-                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints);
+                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints)?;
                     } else {
-                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints);
+                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints)?;
                     }
                 }
                 args::SearchOutput::Message => {}
