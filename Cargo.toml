@@ -10,6 +10,7 @@ homepage = "https://github.com/epage/relint"
 readme = "README.md"
 keywords = ["regex", "lint"]
 license = "Unlicense/MIT"
+categories = ["command-line-utilities", "development-tools", "text-processing"]
 
 [[bin]]
 name = "relint"
