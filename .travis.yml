@@ -1,23 +1,75 @@
-sudo: false
+# Based on the "trust" template v0.1.1
+# https://github.com/japaric/trust/tree/v0.1.1
+
+dist: trusty
 language: rust
-rust:
-- nightly
-- beta
-- stable
+services: docker
+sudo: required
+
+rust: stable
+
+env:
+  global:
+    - CRATE_NAME=relint
+
+    # default job
+    - TARGET=x86_64-unknown-linux-gnu
+
 matrix:
-  allow_failures:
-  - rust: nightly
-before_script:
-- |
-  pip install 'travis-cargo<0.2' --user &&
-  export PATH=$HOME/.local/bin:$PATH
+  include:
+    # Linux
+    - env: TARGET=i686-unknown-linux-gnu
+    # - env: TARGET=x86_64-unknown-linux-gnu # default
+
+    # OSX
+    - env: TARGET=i686-apple-darwin
+      os: osx
+    - env: TARGET=x86_64-apple-darwin
+      os: osx
+
+    # Testing other channels
+    - env: TARGET=x86_64-unknown-linux-gnu
+      rust: nightly
+    - env: TARGET=x86_64-apple-darwin
+      os: osx
+      rust: nightly
+
+before_install: set -e
+
+install:
+  - sh ci/install.sh
+  - source ~/.cargo/env || true
+
 script:
-- |
-  travis-cargo build
+  - bash ci/script.sh
+
+after_script: set +e
+
+before_deploy:
+  - sh ci/before_deploy.sh
+
+deploy:
+  api_key:
+    secure: "SRoPh4qOmvpgJZEvT3p2PA9GZti5i+aVvEavEVDvddZJOgtRlf35eAp8LmlffGWz07zq/D3fPEWSjyTanQdTUMkmTDujfXV3Y9e00rS35eaE0qv+lcJM6Ikwn1bkLrxiCw0M+UqC2myQIdQzltO2DnwTJ/KZex8/BrwSFd1Yw/JTd06LeoIU/Ag1sDx+wSQmVY7w/CLYzuJhDaDZm5yIQTfSfHfO+s8Jil2VTMz5fFTRnahgoaKhItuuu54YHXrZSZeDIAl/F37+2zzLzrpg/b4ifnWghZ15P7bSOuKFP3uqOJ0ozrSvP1UrW1B8YdFY8HiglMcHJN2lSWdo7wyNN6XO2ufF2yO0d+3y4JY142YriPciqVAviUikMdlmtnN8wKbHnzgWeD9NpJTH8AzhltPFZCzOvhMCUdUZ/VkZJdqDYBnDJKeMnhsYXDefQ2mNqIcIRI8C9RGliSvRkkJfwuj9wx1dr3rs91QxR9u+NECv9Tibdm7z3CCeFrAI487+SIN/+kLCmPp7pWWYrMQCzNLi+ndMOfjCObDSlaCZepWs3z3Ly1I8hgC5+Cgot1pXBvRqilYhv3fWdsGNFmsjoZgouKYb3KX2X+OGDEcHpUNBkvWBNaadBvhaVRt3PV8+BH0QCufDThcCkHVGjVydMMXSqw+Cx1QB3X1YcykERl8="
+  file_glob: true
+  file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
+  on:
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+  provider: releases
+  skip_cleanup: true
+
+cache: cargo
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
+branches:
+  only:
+    # release tags
+    - /^v\d+\.\d+\.\d+.*$/
+    - master
+
 notifications:
   email:
     on_success: never
-env:
-  global:
-  - TRAVIS_CARGO_NIGHTLY_FEATURE=dev
-  - secure: # encrypted stuff
