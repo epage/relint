@@ -1,0 +1,4 @@
+[clog]
+repository = "https://github.com/epage/relint"
+changelog = "CHANGES.md"
+from-latest-tag = true
