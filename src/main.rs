@@ -8,9 +8,12 @@ extern crate grep;
 extern crate ignore;
 extern crate toml;
 extern crate libc;
-
+#[macro_use(slog_error, slog_log)]
+extern crate slog;
+extern crate slog_term;
 #[macro_use]
-mod macros;
+extern crate slog_scope;
+
 mod errors;
 mod args;
 mod ripgrep_stolen;
@@ -19,13 +22,14 @@ mod printer;
 
 use std::io;
 use errors::Error;
+use slog::DrainExt;
 
 fn get_or_log_dir_entry(entry: Result<ignore::DirEntry, ignore::Error>)
                         -> Option<ignore::DirEntry> {
     match entry {
         Ok(dent) => {
             if let Some(err) = dent.error() {
-                wlnerr!("{}", err);
+                error!("{}", err);
             }
             let ft = match dent.file_type() {
                 None => return Some(dent), // entry is stdin
@@ -42,7 +46,7 @@ fn get_or_log_dir_entry(entry: Result<ignore::DirEntry, ignore::Error>)
             }
         }
         Err(err) => {
-            wlnerr!("{}", err);
+            error!("{}", err);
             None
         }
     }
@@ -140,14 +144,17 @@ fn run() -> Result<(), Error> {
 }
 
 fn main() {
+    let drain = slog_term::streamer().compact().build().fuse();
+    let root_logger = slog::Logger::root(drain, None);
+    slog_scope::set_global_logger(root_logger);
     match run() {
         Ok(_) => {}
         Err(Error::Argument(ref e)) => {
-            wlnerr!("{}", e);
+            error!("{}", e);
             std::process::exit(2)
         }
         Err(Error::Config(ref e)) => {
-            wlnerr!("{}", e);
+            error!("{}", e);
             std::process::exit(3)
         }
     }
