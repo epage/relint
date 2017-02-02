@@ -6,6 +6,8 @@ relint
 
 Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
+## Usage
+
 ### Installation
 
 If you're a **Rust programmer**, `relint` can be installed with `cargo`:
@@ -17,14 +19,14 @@ $ cargo install relint
 `relint` isn't currently in any other package repositories.
 [I'd like to change that](https://github.com/epage/relint/issues/1).
 
-### Whirlwind tour
-
 ### Regex syntax
 
 The syntax supported is
 [documented as part of Rust's regex library](https://doc.rust-lang.org/regex/regex/index.html#syntax).
 
-### Building
+# Contributing
+
+## Building
 
 `relint` is written in Rust, so you'll need to grab a
 [Rust installation](https://www.rust-lang.org/) in order to compile it.
@@ -38,7 +40,7 @@ $ ./target/release/relint --version
 0.1.0
 ```
 
-### Running tests
+## Running tests
 
 `relint` tries to be well tested, including both unit tests and integration
 tests. To run the full test suite, use:
@@ -48,3 +50,7 @@ $ cargo test
 ```
 
 from the repository root.
+
+## Contributing changes
+
+Please use the [conventional changelog](https://github.com/conventional-changelog/conventional-changelog/blob/4bf7d8df29f7be29552b82ec2b7112fad0c39a3e/conventions/angular.md) format.
