@@ -93,15 +93,14 @@ fn run() -> Result<(), Error> {
     let factory = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
 
     let stdout = std::io::stdout();
-    let mut printer = match app.printer.quiet {
-        true => None,
-        false => {
-            let mut printer = printer::IoPrinter::new(stdout.lock());
-            if app.printer.null {
-                printer = printer.null();
-            }
-            Some(printer)
+    let mut printer = if !app.printer.quiet {
+        let mut printer = printer::IoPrinter::new(stdout.lock());
+        if app.printer.null {
+            printer = printer.null();
         }
+        Some(printer)
+    } else {
+        None
     };
 
     match app.action {

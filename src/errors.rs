@@ -57,7 +57,7 @@ impl error::Error for SpecificFieldError {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            SpecificFieldError::FieldType { .. } => None,
+            SpecificFieldError::FieldType { .. } |
             SpecificFieldError::MissingField => None,
             SpecificFieldError::Ignore(ref err) => Some(err),
             SpecificFieldError::Grep(ref err) => Some(err),
@@ -108,10 +108,10 @@ impl FieldError {
     }
 
     pub fn prefix(self, pre: &str) -> FieldError {
-        return FieldError {
+        FieldError {
             field: format!("{}.{}", pre, self.field),
             error: self.error,
-        };
+        }
     }
 }
 

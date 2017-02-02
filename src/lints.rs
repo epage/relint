@@ -32,14 +32,14 @@ struct FileTypeDef<'a> {
 
 impl<'a> FileTypeDef<'a> {
     fn new_from_table(typedef: &toml::Table) -> Result<FileTypeDef, errors::FieldError> {
-        let name = force_get(&typedef, "name")?;
+        let name = force_get(typedef, "name")?;
         let name = force_as_str(name, "name")?;
-        let glob = force_get(&typedef, "glob")?;
+        let glob = force_get(typedef, "glob")?;
         let glob = force_as_str(glob, "glob")?;
-        return Ok(FileTypeDef {
+        Ok(FileTypeDef {
             name: name,
             glob: glob,
-        });
+        })
     }
 
     fn new_from_array(typedef: &toml::Array) -> Result<FileTypeDef, errors::FieldError> {
@@ -100,12 +100,12 @@ impl Lint {
         if let Some(types) = lint.get("type") {
             match *types {
                 toml::Value::String(ref s) => {
-                    btypes.select(&s);
+                    btypes.select(s);
                 }
                 toml::Value::Array(ref a) => {
                     for s in a.iter().map(|v| force_as_str(v, "type[...]")) {
                         let s = s?;
-                        btypes.select(&s);
+                        btypes.select(s);
                     }
                 }
                 _ => {
@@ -122,12 +122,12 @@ impl Lint {
         if let Some(types) = lint.get("type-not") {
             match *types {
                 toml::Value::String(ref s) => {
-                    btypes.negate(&s);
+                    btypes.negate(s);
                 }
                 toml::Value::Array(ref a) => {
                     for s in a.iter().map(|v| force_as_str(v, "type-not")) {
                         let s = s?;
-                        btypes.negate(&s);
+                        btypes.negate(s);
                     }
                 }
                 _ => {

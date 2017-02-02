@@ -20,7 +20,7 @@ fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
 static PLACEHOLDER: &'static str = "<INVALID>";
 
 #[cfg(not(unix))]
-fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
+fn path_bytes(path: &path::Path) -> &[u8] {
     path.to_str().unwrap_or(PLACEHOLDER).as_bytes()
 }
 

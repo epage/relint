@@ -134,9 +134,9 @@ pub struct App {
 
 impl App {
     pub fn from_args(matches: &clap::ArgMatches) -> Result<App, errors::ArgumentError> {
-        let action = Action::from_args(&matches)?;
+        let action = Action::from_args(matches)?;
         let printer = Printer::from_args(matches)?;
-        let lint_path = get_project_file(&matches, "lints", DEFAULT_CONFIG_FILE)?;
+        let lint_path = get_project_file(matches, "lints", DEFAULT_CONFIG_FILE)?;
 
         Ok(App {
             action: action,
@@ -281,9 +281,6 @@ fn get_project_file(matches: &clap::ArgMatches,
 
 fn default_path() -> path::PathBuf {
     let search_cwd = atty::on_stdin() || !atty::stdin_is_readable();
-    let default_path = match search_cwd {
-        true => CWD,
-        false => STDIN,
-    };
+    let default_path = if search_cwd { CWD } else { STDIN };
     path::Path::new(default_path).to_path_buf()
 }
