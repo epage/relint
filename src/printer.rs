@@ -8,6 +8,7 @@ use ripgrep_stolen::pathutil;
 pub struct IoPrinter<W> {
     writer: W,
     sep: u8,
+    quiet: bool,
 }
 
 impl<W: io::Write> IoPrinter<W> {
@@ -15,15 +16,29 @@ impl<W: io::Write> IoPrinter<W> {
         IoPrinter {
             writer: writer,
             sep: b'\n',
+            quiet: false,
         }
     }
 
-    pub fn null(mut self) -> IoPrinter<W> {
-        self.sep = b'\0';
+    pub fn use_null(mut self, yes: bool) -> IoPrinter<W> {
+        if yes {
+            self.sep = b'\0';
+        } else {
+            self.sep = b'\n';
+        }
+        self
+    }
+
+    pub fn quiet(mut self, yes: bool) -> IoPrinter<W> {
+        self.quiet = yes;
         self
     }
 
     pub fn type_def(&mut self, type_def: &ignore::types::FileTypeDef) {
+        if self.quiet {
+            return;
+        }
+
         self.write(type_def.name().as_bytes());
         self.write(b": ");
         let mut first = true;
@@ -38,6 +53,10 @@ impl<W: io::Write> IoPrinter<W> {
     }
 
     pub fn path(&mut self, path: &path::Path) {
+        if self.quiet {
+            return;
+        }
+
         self.write(path_bytes(pathutil::strip_prefix("./", path).unwrap_or(path)));
         self.write_sep();
     }

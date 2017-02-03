@@ -52,19 +52,16 @@ fn get_or_log_dir_entry(entry: Result<ignore::DirEntry, ignore::Error>)
     }
 }
 
-fn run_types<W: io::Write>(printer: &mut Option<&mut printer::IoPrinter<W>>,
+fn run_types<W: io::Write>(printer: &mut printer::IoPrinter<W>,
                            type_defs: &[ignore::types::FileTypeDef])
                            -> Result<(), Error> {
     for def in type_defs {
-        match *printer {
-            Some(ref mut p) => p.type_def(def),
-            None => {}
-        }
+        printer.type_def(def);
     }
     Ok(())
 }
 
-fn run_file_one_thread<W: io::Write>(printer: &mut Option<&mut printer::IoPrinter<W>>,
+fn run_file_one_thread<W: io::Write>(printer: &mut printer::IoPrinter<W>,
                                      walker: ignore::Walk,
                                      lints: &[lints::Lint])
                                      -> Result<(), Error> {
@@ -80,10 +77,7 @@ fn run_file_one_thread<W: io::Write>(printer: &mut Option<&mut printer::IoPrinte
         if !matched_file {
             continue;
         }
-        match *printer {
-            Some(ref mut p) => p.path(dent.path()),
-            None => {}
-        }
+        printer.path(dent.path());
     }
     Ok(())
 }
@@ -97,15 +91,8 @@ fn run() -> Result<(), Error> {
     let factory = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
 
     let stdout = std::io::stdout();
-    let mut printer = if !app.printer.quiet {
-        let mut printer = printer::IoPrinter::new(stdout.lock());
-        if app.printer.null {
-            printer = printer.null();
-        }
-        Some(printer)
-    } else {
-        None
-    };
+    let mut printer =
+        printer::IoPrinter::new(stdout.lock()).use_null(app.printer.null).quiet(app.printer.quiet);
 
     match app.action {
         args::Action::Search { ref input, ref min_severity, ref output } => {
@@ -126,9 +113,9 @@ fn run() -> Result<(), Error> {
             match *output {
                 args::SearchOutput::None => {
                     if input.threads == 1 || input.is_one_path() {
-                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints)?;
+                        run_file_one_thread(&mut printer, wd.build(), &lints)?;
                     } else {
-                        run_file_one_thread(&mut printer.as_mut(), wd.build(), &lints)?;
+                        run_file_one_thread(&mut printer, wd.build(), &lints)?;
                     }
                 }
                 args::SearchOutput::Message => {}
@@ -138,7 +125,7 @@ fn run() -> Result<(), Error> {
         }
         args::Action::PrintTypes => {
             let types = factory.build_types()?;
-            run_types(&mut printer.as_mut(), types.definitions())
+            run_types(&mut printer, types.definitions())
         }
     }
 }
