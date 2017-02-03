@@ -24,6 +24,22 @@ use std::io;
 use errors::Error;
 use slog::DrainExt;
 
+enum ActionStatus {
+    Success,
+    Failure,
+}
+
+fn run_types<W: io::Write>(printer: &mut printer::IoPrinter<W>,
+                           type_defs: &[ignore::types::FileTypeDef])
+                           -> Result<ActionStatus, Error> {
+    let mut status = ActionStatus::Failure;
+    for def in type_defs {
+        status = ActionStatus::Success;
+        printer.type_def(def);
+    }
+    Ok(status)
+}
+
 fn get_or_log_dir_entry(entry: Result<ignore::DirEntry, ignore::Error>)
                         -> Option<ignore::DirEntry> {
     match entry {
@@ -52,40 +68,28 @@ fn get_or_log_dir_entry(entry: Result<ignore::DirEntry, ignore::Error>)
     }
 }
 
-fn run_types<W: io::Write>(printer: &mut printer::IoPrinter<W>,
-                           type_defs: &[ignore::types::FileTypeDef])
-                           -> Result<(), Error> {
-    for def in type_defs {
-        printer.type_def(def);
-    }
-    Ok(())
+fn is_file_supported(dent: &ignore::DirEntry, lints: &[lints::Lint]) -> bool {
+    lints.iter()
+        .any(|lint| lint.types.is_empty() || lint.types.matched(dent.path(), false).is_whitelist())
 }
 
 fn run_file_one_thread<W: io::Write>(printer: &mut printer::IoPrinter<W>,
                                      walker: ignore::Walk,
                                      lints: &[lints::Lint])
-                                     -> Result<(), Error> {
-    for result in walker {
-        let dent = match get_or_log_dir_entry(result) {
-            Some(dent) => dent,
-            None => continue,
-        };
-        let matched_file = lints.iter()
-            .any(|lint| {
-                lint.types.is_empty() || lint.types.matched(dent.path(), false).is_whitelist()
-            });
-        if !matched_file {
-            continue;
-        }
+                                     -> Result<ActionStatus, Error> {
+    let mut status = ActionStatus::Failure;
+    for dent in walker.filter_map(get_or_log_dir_entry)
+        .filter(|dent| is_file_supported(dent, lints)) {
+        status = ActionStatus::Success;
         printer.path(dent.path());
     }
-    Ok(())
+    Ok(status)
 }
 
-fn run() -> Result<(), Error> {
+fn run() -> Result<ActionStatus, Error> {
     let matches = match args::parse_args()? {
         Some(m) => m,
-        None => return Ok(()),
+        None => return Ok(ActionStatus::Success),
     };
     let app = args::App::from_args(&matches)?;
     let factory = lints::TomlLintFactory::new_from_path(&app.lint_path)?;
@@ -94,6 +98,7 @@ fn run() -> Result<(), Error> {
     let mut printer =
         printer::IoPrinter::new(stdout.lock()).use_null(app.printer.null).quiet(app.printer.quiet);
 
+    let status: ActionStatus;
     match app.action {
         args::Action::Search { ref input, ref min_severity, ref output } => {
             let lints = factory.build_lints()?;
@@ -112,18 +117,19 @@ fn run() -> Result<(), Error> {
                 .threads(input.threads);
             match *output {
                 args::SearchOutput::None => {
-                    run_file_one_thread(&mut printer, wd.build(), &lints)?;
+                    status = run_file_one_thread(&mut printer, wd.build(), &lints)?;
                 }
-                args::SearchOutput::Message => {}
-                args::SearchOutput::File { matched } => {}
+                args::SearchOutput::Message => status = ActionStatus::Failure,
+                args::SearchOutput::File { matched } => status = ActionStatus::Failure,
             }
-            Ok(())
         }
         args::Action::PrintTypes => {
             let types = factory.build_types()?;
-            run_types(&mut printer, types.definitions())
+            status = run_types(&mut printer, types.definitions())?
         }
     }
+
+    Ok(status)
 }
 
 fn main() {
@@ -131,7 +137,8 @@ fn main() {
     let root_logger = slog::Logger::root(drain, None);
     slog_scope::set_global_logger(root_logger);
     match run() {
-        Ok(_) => {}
+        Ok(ActionStatus::Success) => {}
+        Ok(ActionStatus::Failure) => std::process::exit(1),
         Err(Error::Argument(ref e)) => {
             error!("{}", e);
             std::process::exit(2)
