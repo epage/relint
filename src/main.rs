@@ -112,11 +112,7 @@ fn run() -> Result<(), Error> {
                 .threads(input.threads);
             match *output {
                 args::SearchOutput::None => {
-                    if input.threads == 1 || input.is_one_path() {
-                        run_file_one_thread(&mut printer, wd.build(), &lints)?;
-                    } else {
-                        run_file_one_thread(&mut printer, wd.build(), &lints)?;
-                    }
+                    run_file_one_thread(&mut printer, wd.build(), &lints)?;
                 }
                 args::SearchOutput::Message => {}
                 args::SearchOutput::File { matched } => {}
