@@ -10,20 +10,6 @@ pub struct IoPrinter<W> {
     sep: u8,
 }
 
-#[cfg(unix)]
-fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
-    use std::os::unix::ffi::OsStrExt;
-
-    path.as_os_str().as_bytes()
-}
-
-static PLACEHOLDER: &'static str = "<INVALID>";
-
-#[cfg(not(unix))]
-fn path_bytes(path: &path::Path) -> &[u8] {
-    path.to_str().unwrap_or(PLACEHOLDER).as_bytes()
-}
-
 impl<W: io::Write> IoPrinter<W> {
     pub fn new(writer: W) -> IoPrinter<W> {
         IoPrinter {
@@ -64,4 +50,18 @@ impl<W: io::Write> IoPrinter<W> {
         let sep = self.sep;
         self.write(&[sep]);
     }
+}
+
+#[cfg(unix)]
+fn path_bytes<'a>(path: &'a path::Path) -> &'a [u8] {
+    use std::os::unix::ffi::OsStrExt;
+
+    path.as_os_str().as_bytes()
+}
+
+static PLACEHOLDER: &'static str = "<INVALID>";
+
+#[cfg(not(unix))]
+fn path_bytes(path: &path::Path) -> &[u8] {
+    path.to_str().unwrap_or(PLACEHOLDER).as_bytes()
 }
